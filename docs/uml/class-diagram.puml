@@ -1,0 +1,161 @@
+@startuml class-diagram
+' Render: paste this text into https://www.plantuml.com/plantuml and download PNG
+title Financial Trading Platform - Class Diagram
+skinparam classAttributeIconSize 0
+hide empty members
+
+package "facade  [FACADE]" {
+  class TradingPlatform {
+    +connect(exchangeName)
+    +startBot(symbol, strategyName, quantity): String
+    +changeBotStrategy(botName, strategyName)
+    +stopBot(botName)
+    +runMarket(ticks)
+    +placeMarketOrder(side, symbol, quantity): OrderResult
+    +placeLimitOrder(side, symbol, quantity, price): OrderResult
+    +printPortfolio()
+  }
+}
+
+package "marketdata  [OBSERVER]" {
+  class MarketDataFeed {
+    +subscribe(MarketDataListener)
+    +unsubscribe(MarketDataListener)
+    +nextTick()
+    +getPrice(symbol): double
+  }
+  interface MarketDataListener {
+    +onPriceUpdate(symbol, price)
+  }
+  class PriceDisplay
+}
+
+package "strategy  [STRATEGY]" {
+  interface TradingStrategy {
+    +getName(): String
+    +decide(prices): Signal
+  }
+  class MovingAverageStrategy
+  class MomentumStrategy
+  class MeanReversionStrategy
+  enum Signal {
+    BUY
+    SELL
+    HOLD
+  }
+}
+
+package bot {
+  class TradingBot {
+    +onPriceUpdate(symbol, price)
+    +setStrategy(TradingStrategy)
+  }
+}
+
+package "model  [BUILDER]" {
+  class Order {
+    -Order(Builder)
+  }
+  class "Order.Builder" as Builder {
+    +symbol(String): Builder
+    +side(OrderSide): Builder
+    +quantity(double): Builder
+    +limitPrice(double): Builder
+    +source(String): Builder
+    +build(): Order
+  }
+  class OrderResult
+}
+
+package "exchange  [ADAPTER]" {
+  interface Exchange {
+    +getName(): String
+    +connect()
+    +disconnect()
+    +supports(symbol): boolean
+    +getPrice(symbol): double
+    +placeOrder(Order): OrderResult
+  }
+  class BinanceAdapter
+  class NasdaqAdapter
+  class BinanceApi <<Adaptee>> {
+    +login(apiKey)
+    +getTickerPrice(pair): String
+    +newOrder(pair, side, quantity): String
+  }
+  class NasdaqApi <<Adaptee>> {
+    +openSession(user)
+    +getPriceInCents(ticker): long
+    +sendOrder(ticker, side, shares): int
+  }
+}
+
+package "decorator  [DECORATOR]" {
+  abstract class ExchangeDecorator {
+    #exchange: Exchange
+  }
+  class LoggingExchange
+  class RiskLimitExchange
+}
+
+package "factory  [FACTORY METHOD]" {
+  abstract class ExchangeFactory {
+    +connectToExchange(): Exchange
+    #{abstract} createExchange(): Exchange
+  }
+  class BinanceFactory
+  class NasdaqFactory
+}
+
+class OrderService {
+  +execute(Order): OrderResult
+}
+class Portfolio
+
+' Observer
+MarketDataFeed o--> "*" MarketDataListener : notifies
+MarketDataListener <|.. PriceDisplay
+MarketDataListener <|.. TradingBot
+
+' Strategy
+TradingStrategy <|.. MovingAverageStrategy
+TradingStrategy <|.. MomentumStrategy
+TradingStrategy <|.. MeanReversionStrategy
+TradingBot o--> TradingStrategy : uses
+
+' Builder
+Order +-- Builder
+Builder ..> Order : creates
+TradingBot ..> Builder
+
+' Adapter
+Exchange <|.. BinanceAdapter
+Exchange <|.. NasdaqAdapter
+BinanceAdapter --> BinanceApi : adapts
+NasdaqAdapter --> NasdaqApi : adapts
+
+' Decorator
+Exchange <|.. ExchangeDecorator
+ExchangeDecorator o--> Exchange : wraps
+ExchangeDecorator <|-- LoggingExchange
+ExchangeDecorator <|-- RiskLimitExchange
+
+' Factory Method
+ExchangeFactory <|-- BinanceFactory
+ExchangeFactory <|-- NasdaqFactory
+BinanceFactory ..> BinanceAdapter : creates
+NasdaqFactory ..> NasdaqAdapter : creates
+ExchangeFactory ..> ExchangeDecorator : wraps result
+
+' Orders
+TradingBot --> OrderService
+OrderService --> Exchange
+OrderService --> Portfolio
+
+' Facade
+TradingPlatform --> MarketDataFeed
+TradingPlatform --> ExchangeFactory
+TradingPlatform --> OrderService
+TradingPlatform --> Portfolio
+TradingPlatform --> "*" TradingBot
+@enduml

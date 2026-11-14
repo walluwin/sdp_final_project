@@ -1,0 +1,32 @@
+@startuml sequence-bot-trade
+title New price -> bot decides -> order goes to the exchange
+autonumber
+
+participant MarketDataFeed <<Subject>>
+participant TradingBot <<Observer>>
+participant TradingStrategy <<Strategy>>
+participant "Order.Builder" as Builder <<Builder>>
+participant OrderService
+participant LoggingExchange <<Decorator>>
+participant RiskLimitExchange <<Decorator>>
+participant BinanceAdapter <<Adapter>>
+participant BinanceApi <<Adaptee>>
+participant Portfolio
+
+MarketDataFeed -> TradingBot : onPriceUpdate("BTC/USD", 65000)
+TradingBot -> TradingStrategy : decide(prices)
+TradingStrategy --> TradingBot : BUY
+TradingBot -> Builder : symbol().side().quantity().build()
+Builder --> TradingBot : order
+TradingBot -> OrderService : execute(order)
+OrderService -> OrderService : check money / limit price
+OrderService -> LoggingExchange : placeOrder(order)
+LoggingExchange -> RiskLimitExchange : placeOrder(order)
+RiskLimitExchange -> BinanceAdapter : placeOrder(order)
+BinanceAdapter -> BinanceApi : newOrder("BTCUSDT", "BUY", "0.2")
+BinanceApi --> BinanceAdapter : "OK:65000.0"
+BinanceAdapter --> RiskLimitExchange : OrderResult (FILLED)
+RiskLimitExchange --> LoggingExchange : result
+LoggingExchange --> OrderService : result (printed)
+OrderService -> Portfolio : addBuy("BTC/USD", 0.2, 65000)
+@enduml

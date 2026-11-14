@@ -1,0 +1,22 @@
+@startuml sequence-connect
+title connect("BINANCE"): Facade -> Factory Method -> Adapter + Decorators
+autonumber
+
+actor User
+participant Main
+participant TradingPlatform <<Facade>>
+participant BinanceFactory <<Factory Method>>
+participant BinanceAdapter <<Adapter>>
+participant LoggingExchange <<Decorator>>
+participant OrderService
+
+User -> Main : menu "1) Connect to exchange"
+Main -> TradingPlatform : connect("BINANCE")
+TradingPlatform -> BinanceFactory : connectToExchange()
+BinanceFactory -> BinanceFactory : createExchange()
+BinanceFactory -> BinanceAdapter ** : new BinanceAdapter(new BinanceApi(market))
+BinanceFactory -> LoggingExchange ** : new LoggingExchange(new RiskLimitExchange(adapter))
+BinanceFactory -> LoggingExchange : connect()
+BinanceFactory --> TradingPlatform : exchange
+TradingPlatform -> OrderService : setExchange(exchange)
+@enduml
